@@ -77,12 +77,12 @@
 #ifndef I3D_CORE_LOGGING_H_
 #define I3D_CORE_LOGGING_H_
 
+#include <chrono>
+#include <ctime>
+#include <iostream>
+#include <ostream>
 #include <sstream>
 #include <string>
-#include <ostream>
-#include <iostream>
-#include <ctime>
-#include <chrono>
 
 // Define the compile-time log threshold
 #define I3D_LOGGING_STATIC_LEVEL_LIMIT ::i3d::detail
@@ -105,98 +105,104 @@
 // 36m - cyan
 // 37m - white
 //
-#define I3D_LOGGING_COLOR_FATAL         "\33[35m"
-#define I3D_LOGGING_COLOR_ERROR         "\33[31m"
-#define I3D_LOGGING_COLOR_WARNING       "\33[33m"
-#define I3D_LOGGING_COLOR_INFO          "\33[32m"
-#define I3D_LOGGING_COLOR_DEBUG         "\33[36m"
-#define I3D_LOGGING_COLOR_TRACE         ""
-#define I3D_LOGGING_COLOR_DETAIL        "\33[34m"
-#define I3D_LOGGING_COLOR_ALLOFF        "\33[0m"
+#define I3D_LOGGING_COLOR_FATAL "\33[35m"
+#define I3D_LOGGING_COLOR_ERROR "\33[31m"
+#define I3D_LOGGING_COLOR_WARNING "\33[33m"
+#define I3D_LOGGING_COLOR_INFO "\33[32m"
+#define I3D_LOGGING_COLOR_DEBUG "\33[36m"
+#define I3D_LOGGING_COLOR_TRACE ""
+#define I3D_LOGGING_COLOR_DETAIL "\33[34m"
+#define I3D_LOGGING_COLOR_ALLOFF "\33[0m"
 
 namespace i3d {
 
 enum LogLevel {
-    show_all = 8,
-    detail = 7,
-    trace = 6,
-    debug = 5,
-    info = 4,
-    warning = 3,
-    error = 2,
-    fatal = 1,
-    nothing = 0
+  show_all = 8,
+  detail = 7,
+  trace = 6,
+  debug = 5,
+  info = 4,
+  warning = 3,
+  error = 2,
+  fatal = 1,
+  nothing = 0
 };
 
 class Logging {
 
 public:
-    Logging(LogLevel level, const std::string &file, int line, const std::string &function, bool append_crlf);
-    Logging(LogLevel level);
-    ~Logging();
-    std::ostream& getStream() { return stream_; };
-    std::ostream& addPrefix(const std::string &file, int line);
+  Logging(LogLevel level, const std::string &file, int line,
+          const std::string &function, bool append_crlf);
+  Logging(LogLevel level);
+  ~Logging();
+  std::ostream &getStream() { return stream_; };
+  std::ostream &addPrefix(const std::string &file, int line);
 
-    static void setLogThreshold(LogLevel level) { threshold_ = level; };
-    static LogLevel getLogThreshold() { return threshold_; };
+  static void setLogThreshold(LogLevel level) { threshold_ = level; };
+  static LogLevel getLogThreshold() { return threshold_; };
 
-    static void displayColor(bool enable) { enable_colors_ = enable; };
-    static void displayTimeStamp(bool enable) { enable_timestamp_ = enable; };
-    static void displaySeverity(bool enable) { enable_severity_ = enable; };
-    static void displayFileName(bool enable) { enable_filename_ = enable; };
+  static void displayColor(bool enable) { enable_colors_ = enable; };
+  static void displayTimeStamp(bool enable) { enable_timestamp_ = enable; };
+  static void displaySeverity(bool enable) { enable_severity_ = enable; };
+  static void displayFileName(bool enable) { enable_filename_ = enable; };
 
 private:
-    std::ostringstream stream_;
-    bool append_crlf_;
-    static LogLevel threshold_;
-    static bool enable_colors_;
-    static bool enable_timestamp_;
-    static bool enable_severity_;
-    static bool enable_filename_;
-    static bool enable_functionname_;
-    static const char* const log_colors_[];
-    static const char* const level_indicators_[];
+  std::ostringstream stream_;
+  bool append_crlf_;
+  static LogLevel threshold_;
+  static bool enable_colors_;
+  static bool enable_timestamp_;
+  static bool enable_severity_;
+  static bool enable_filename_;
+  static bool enable_functionname_;
+  static const char *const log_colors_[];
+  static const char *const level_indicators_[];
 
-    Logging();
-    Logging(const Logging&);
-    Logging& operator=(const Logging&);
+  Logging();
+  Logging(const Logging &);
+  Logging &operator=(const Logging &);
 };
 
+} // namespace i3d
 
-} // End of i3d namespace
+#define LOG_PREFIX(level)                                                      \
+  if (level > I3D_LOGGING_STATIC_LEVEL_LIMIT)                                  \
+    ;                                                                          \
+  else if (level > i3d::Logging::getLogThreshold())                            \
+    ;                                                                          \
+  else                                                                         \
+    i3d::Logging(level, __FILE__, __LINE__, __FUNCTION__, false).getStream()
 
-#define LOG_PREFIX(level)                                \
-    if( level > I3D_LOGGING_STATIC_LEVEL_LIMIT ) ;       \
-    else if( level > i3d::Logging::getLogThreshold() ) ; \
-    else i3d::Logging(level, __FILE__, __LINE__, __FUNCTION__, false).getStream()
+#define LOG_BARE(level)                                                        \
+  if (level > I3D_LOGGING_STATIC_LEVEL_LIMIT)                                  \
+    ;                                                                          \
+  else if (level > i3d::Logging::getLogThreshold())                            \
+    ;                                                                          \
+  else                                                                         \
+    i3d::Logging(level).getStream()
 
-#define LOG_BARE(level)                                  \
-    if( level > I3D_LOGGING_STATIC_LEVEL_LIMIT ) ;       \
-    else if( level > i3d::Logging::getLogThreshold() ) ; \
-    else i3d::Logging(level).getStream()
+#define I3D_LOG(level)                                                         \
+  if (level > I3D_LOGGING_STATIC_LEVEL_LIMIT)                                  \
+    ;                                                                          \
+  else if (level > i3d::Logging::getLogThreshold())                            \
+    ;                                                                          \
+  else                                                                         \
+    i3d::Logging(level, __FILE__, __LINE__, __FUNCTION__, true).getStream()
 
-#define I3D_LOG(level)									 \
-	if( level > I3D_LOGGING_STATIC_LEVEL_LIMIT ) ;       \
-	else if( level > i3d::Logging::getLogThreshold() ) ; \
-    else i3d::Logging(level, __FILE__, __LINE__, __FUNCTION__, true).getStream()
-
-
-inline void LOG_THRESHOLD(::i3d::LogLevel level)
-{
-    ::i3d::Logging::setLogThreshold(level);
+inline void LOG_THRESHOLD(::i3d::LogLevel level) {
+  ::i3d::Logging::setLogThreshold(level);
 }
 
-inline void LOG_FORMAT(bool colors, bool timestamp, bool severity, bool filename)
-{
+inline void LOG_FORMAT(bool colors, bool timestamp, bool severity,
+                       bool filename) {
 #if WIN32
-    ::i3d::Logging::displayColor(false);
+  ::i3d::Logging::displayColor(false);
 #else
-	::i3d::Logging::displayColor(colors);
+  ::i3d::Logging::displayColor(colors);
 #endif
-    ::i3d::Logging::displayTimeStamp(timestamp);
-    ::i3d::Logging::displaySeverity(severity);
-    ::i3d::Logging::displayFileName(filename);
+  ::i3d::Logging::displayTimeStamp(timestamp);
+  ::i3d::Logging::displaySeverity(severity);
+  ::i3d::Logging::displayFileName(filename);
 }
-
 
 #endif

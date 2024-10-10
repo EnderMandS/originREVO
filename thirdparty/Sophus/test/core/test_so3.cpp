@@ -9,7 +9,7 @@
 namespace Eigen {
 template class Map<Sophus::SO3<double>>;
 template class Map<Sophus::SO3<double> const>;
-}
+}  // namespace Eigen
 
 namespace Sophus {
 

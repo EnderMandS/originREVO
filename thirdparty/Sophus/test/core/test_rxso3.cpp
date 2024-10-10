@@ -8,7 +8,7 @@
 namespace Eigen {
 template class Map<Sophus::RxSO3<double>>;
 template class Map<Sophus::RxSO3<double> const>;
-}
+}  // namespace Eigen
 
 namespace Sophus {
 
@@ -196,6 +196,6 @@ int test_rxso3() {
   return 0;
 }
 
-}  // Sophus
+}  // namespace Sophus
 
 int main() { return Sophus::test_rxso3(); }

@@ -1,8 +1,8 @@
-Scalar const c0 = 0.5*q.w();
-Scalar const c1 = 0.5*q.z();
-Scalar const c2 = 0.5*q.y();
+Scalar const c0 = 0.5 * q.w();
+Scalar const c1 = 0.5 * q.z();
+Scalar const c2 = 0.5 * q.y();
 Scalar const c3 = -c2;
-Scalar const c4 = 0.5*q.x();
+Scalar const c4 = 0.5 * q.x();
 Scalar const c5 = -c4;
 Scalar const c6 = -c1;
 result[0] = c0;

@@ -1,158 +1,102 @@
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 3.4)
 set(PROJECT_NAME "REVO")
 project(${PROJECT_NAME})
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/" )
-MESSAGE("cmake: ${CMAKE_SOURCE_DIR}/ThirdParty/libuvc/build/CMakeFiles")
+
+SET(CMAKE_BUILD_TYPE RELEASE)
+
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Wall -O1 -msse3 -msse4.1 -mavx2 -fopenmp")
 set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -O1 -msse3 -msse4.1 -mavx2 -fopenmp")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -O3 -msse3 -msse4.1 -mavx2 -fopenmp")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -msse3 -msse4.1 -mavx2 -fopenmp")
-SET(CMAKE_BUILD_TYPE DEBUG)
-#SET(CMAKE_BUILD_TYPE RELEASE)
+
 include(CheckCXXCompilerFlag)
-CHECK_CXX_COMPILER_FLAG("-std=c++11" COMPILER_SUPPORTS_CXX11)
+CHECK_CXX_COMPILER_FLAG("-std=c++17" COMPILER_SUPPORTS_CXX17)
 CHECK_CXX_COMPILER_FLAG("-std=c++0x" COMPILER_SUPPORTS_CXX0X)
-if(COMPILER_SUPPORTS_CXX11)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
-     message(STATUS "The compiler ${CMAKE_CXX_COMPILER} has C++11 support. Please use a different C++ compiler.")
+if(COMPILER_SUPPORTS_CXX17)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17")
+     message(STATUS "The compiler ${CMAKE_CXX_COMPILER} has c++17 support. Please use a different C++ compiler.")
 elseif(COMPILER_SUPPORTS_CXX0X)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
- 	message(STATUS "The compiler ${CMAKE_CXX_COMPILER} has no C++11 support. Please use a different C++ compiler.")
+ 	message(STATUS "The compiler ${CMAKE_CXX_COMPILER} has no c++17 support. Please use a different C++ compiler.")
 else()
-        message(STATUS "The compiler ${CMAKE_CXX_COMPILER} has no C++11 support. Please use a different C++ compiler.")
+        message(STATUS "The compiler ${CMAKE_CXX_COMPILER} has no c++17 support. Please use a different C++ compiler.")
 endif()
 
-#thirdparty
+# Initialize variables to hold all source and header files
+set(FILE_DIRS system utils datastructures io pidinet)
+set(ALL_SOURCES "main.cpp")
+set(ALL_HEADERS "")
 
-OPTION(WITH_PANGOLIN_VIEWER "Build with Pangolin viewer?" ON)
-if (WITH_PANGOLIN_VIEWER)
-    find_package(Pangolin REQUIRED)
-    include_directories(${Pangolin_INCLUDE_DIRS})
-    list(APPEND LIBS ${Pangolin_LIBRARIES})
-    list(APPEND SRC_FILES "gui/Viewer.cc" "gui/MapDrawer.cc")
-    list(APPEND HEADER_FILES "gui/Viewer.h" "gui/MapDrawer.h" "gui/PointCloudBuffered.h")
-    add_definitions(-DWITH_PANGOLIN_VIEWER)
-endif()
-
-#LibRealSense
-OPTION(WITH_REALSENSE "Build with RealSense Sensor?" ON)
-if (WITH_REALSENSE)
-    list(APPEND SRC_FILES "io/realsensesensor.cpp")
-    list(APPEND HEADER_FILES "io/realsensesensor.h")
-    add_definitions(-DWITH_REALSENSE)
-    list(APPEND LIBS "realsense")
-endif()
-
-find_package(OpenCV 3 REQUIRED opencv_core opencv_videoio opencv_imgcodecs opencv_imgproc opencv_calib3d opencv_highgui)
+# OpenCV
+find_package(OpenCV 3.4.16 REQUIRED PATHS /opt/opencv/34)
 if(NOT OpenCV_FOUND)
-   find_package(OpenCV 2.4.3 QUIET)
-   if(NOT OpenCV_FOUND)
-      message(FATAL_ERROR "OpenCV > 2.4.3 not found.")
-   endif()
+    message(FATAL_ERROR "OpenCV > 3.4.16 not found.")
 endif()
 
-#Orbbec Astra
-#OPTION(WITH_ORBBEC_ASTRA_PRO "Build with Orbbec support?" ON)
-OPTION(WITH_ORBBEC_FFMPEG "Use FFMPEG for ORBBEC Astra Pro (recommended)" ON)
-OPTION(WITH_ORBBEC_UVC "Use LibUVC for ORBBEC Astra Pro (not recommended)" OFF)
-OPTION(WITH_ORBBEC_OPENNI "Use OpenNI for ORBBEC Astra (NOTE: This is for the non-pro version!!)" ON)
-
-IF (WITH_ORRBEC_FFMPEG AND WITH_ORBBEC_UVC)
-    MESSAGE(FATAL_ERROR "Please choose either FFMPEG (recommended) or libUVC for Orbbec Astra support")
-ENDIF()
-
-IF (WITH_ORBBEC_UVC)
-    IF (WITH_REALSENSE)
-        MESSAGE(FATAL_ERROR "CAN'T BUILD WITH REALSENSE AND ORBBEC SENSOR!!! This is because of the different libuvc versions!")
-    ENDIF(WITH_REALSENSE)
-    find_package(libuvc REQUIRED)
-
-    IF(DEFINED libuvc_INCLUDE_DIRS)
-      include_directories(${libuvc_INCLUDE_DIRS})
-      add_definitions(-DCOMPILE_WITH_LibUVC)
-      list(APPEND LIBS "${libuvc_LIBRARIES}")
-      list(APPEND SRC_FILES "orbbec_astra_pro/OrbbecAstraEngineUVC.cpp")
-      list(APPEND HEADER_FILES "orbbec_astra_pro/OrbbecAstraEngineUVC.h")
-      if (NOT DEFINED OpenNI_ASTRA_PRO_LIB)
-         set(OpenNI_ASTRA_PRO_LIB "${CMAKE_SOURCE_DIR}/orbbec_astra_pro/drivers/libOpenNI2.so")
-      endif()
-      if (NOT DEFINED OpenNI_ASTRA_PRO_INCLUDE_DIR)
-         set(OpenNI_ASTRA_PRO_INCLUDE_DIR " ${CMAKE_SOURCE_DIR}/orbbec_astra_pro/drivers/Include/")
-      endif()
-      include_directories(${OpenNI_ASTRA_PRO_INCLUDE_DIR})
-      list(APPEND LIBS ${OpenNI_ASTRA_PRO_LIB} ${OpenCV_LIBS})
-    ELSE()
-        MESSAGE(FATAL_ERROR "LIBUVC directories not found!")
-    ENDIF()
-    add_definitions(-DWITH_ORBBEC_ASTRA_PRO)
-ENDIF(WITH_ORBBEC_UVC)
-
-IF (WITH_ORBBEC_FFMPEG)
-    if (NOT DEFINED OpenNI_ASTRA_PRO_LIB)
-       set(OpenNI_ASTRA_PRO_LIB "${CMAKE_SOURCE_DIR}/orbbec_astra_pro/drivers/libOpenNI2.so")
-    endif()
-    if (NOT DEFINED OpenNI_ASTRA_PRO_INCLUDE_DIR)
-       set(OpenNI_ASTRA_PRO_INCLUDE_DIR " ${CMAKE_SOURCE_DIR}/orbbec_astra_pro/drivers/Include/")
-    endif()
-    include_directories(${OpenNI_ASTRA_PRO_INCLUDE_DIR})
-    list(APPEND LIBS ${OpenNI_ASTRA_PRO_LIB})
-    add_definitions(-DWITH_ORBBEC_FFMPEG)
-    include("cmake/external_FFMPEG.cmake")
-    #now we try to add ffmpeg
-    list(APPEND SRC_FILES "orbbec_astra_pro/OrbbecAstraEngineFFMPEG.cpp")
-    list(APPEND HEADER_FILES "orbbec_astra_pro/OrbbecAstraEngineFFMPEG.h")
-    include_directories(${FFMPEG_INCLUDE_DIR})
-    add_definitions(-DWITH_ORBBEC_ASTRA_PRO)
-ENDIF(WITH_ORBBEC_FFMPEG)
-
-#for the standard Orbbec Astra
-IF (WITH_ORBBEC_OPENNI)
-    if (NOT DEFINED OpenNI_ASTRA_PRO_LIB)
-       set(OpenNI_ASTRA_PRO_LIB "${CMAKE_SOURCE_DIR}/orbbec_astra_pro/drivers/libOpenNI2.so")
-    endif()
-    if (NOT DEFINED OpenNI_ASTRA_PRO_INCLUDE_DIR)
-       set(OpenNI_ASTRA_PRO_INCLUDE_DIR " ${CMAKE_SOURCE_DIR}/orbbec_astra_pro/drivers/Include/")
-    endif()
-    include_directories(${OpenNI_ASTRA_PRO_INCLUDE_DIR})
-    list(APPEND SRC_FILES "orbbec_astra_pro/OrbbecAstraOpenNIEngine.cpp")
-    list(APPEND HEADER_FILES "orbbec_astra_pro/OrbbecAstraOpenNIEngine.h")
-    add_definitions(-DWITH_ORBBEC_ASTRA)
-ENDIF(WITH_ORBBEC_OPENNI)
-
-list(APPEND LIBS ${OpenCV_LIBS})
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} ${FLAGS}")
-set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} ${FLAGS}")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${FLAGS}")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${FLAGS}")
-message("OpenCV: ${OpenCV_INCLUDE_DIRS}")
-find_package(Eigen3 REQUIRED)
-INCLUDE_DIRECTORIES("thirdparty/Sophus")
-include_directories(${EIGEN3_INCLUDE_DIRS})
-message("Eigen found: ${EIGEN3_INCLUDE_DIRS} ${EIGEN_INCLUDE_DIRS} ${Eigen_INCLUDE_DIRS}")
-
-
-
-
+# Boost
 find_package(Boost COMPONENTS system filesystem REQUIRED)
-list(APPEND LIBS ${Boost_FILESYSTEM_LIBRARY} ${Boost_SYSTEM_LIBRARY})
 
-#UTILS
-list(APPEND UTILITY_SRC_FILES "utils/Logging.cpp")
-list(APPEND UTILITY_HEADER_FILES "utils/timer.h" "utils/Logging.h")
+# CUDA
+find_package(CUDA REQUIRED)
+message("CUDA_INCLUDE_DIRS: ${CUDA_INCLUDE_DIRS}")
+include_directories(${CUDA_INCLUDE_DIRS})
 
-#DATA STRUCTURES
-list(APPEND DATASTRUC_SRC_FILES "datastructures/imgpyramidrgbd.cpp")
-list(APPEND DATASTRUC_HEADER_FILES "datastructures/imgpyramidrgbd.h" "datastructures/camerapyr.h")
+# cuDNN
+set(CUDNN_DIR /opt/cudnn/cudnn-linux-x86_64-9.4.0.58_cuda12-archive)
+include_directories(${CUDNN_DIR}/include)
+file(GLOB CUDNN_LIBRARIES "${TENSORRT_LIBRARY_DIR}/*.so")
 
-#Input/Output
-list(APPEND DATASTRUC_SRC_FILES "io/iowrapperRGBD.cpp")
-list(APPEND DATASTRUC_HEADER_FILES "io/iowrapperRGBD.h")
+# TensorRT
+set(TENSORRT_DIR /opt/tensorrt/CUDA12/TensorRT-10.4.0.26)
+include_directories(${TENSORRT_DIR}/include)
+file(GLOB TENSORRT_LIBRARIES "${TENSORRT_DIR}/lib/*.so")
 
-#CORE SYSTEM
-list(APPEND DATASTRUC_SRC_FILES "system/system.cpp" "system/tracker.cpp" "system/optimizer.cpp")# "system/windowedoptimization.cpp")
-list(APPEND DATASTRUC_HEADER_FILES "system/system.h" "system/tracker.h" "system/optimizer.h")# "system/windowedoptimization.h")
+# Eigen
+find_package(Eigen3 REQUIRED)
+include_directories(${EIGEN3_INCLUDE_DIRS})
 
-list(APPEND SRC_FILES ${SRC_FILES} "main.cpp")
-add_executable(${PROJECT_NAME} ${SRC_FILES} ${HEADER_FILES} ${UTILITY_SRC_FILES} ${UTILITY_HEADER_FILES} ${DATASTRUC_SRC_FILES} ${DATASTRUC_HEADER_FILES})
-message("libuvc_LIBRARIES: ${libuvc_LIBRARIES}, ${LIBS}")
-target_link_libraries(${PROJECT_NAME} ${LIBS} ${FFMPEG_LIBRARIES})
+# Sophus
+include_directories("thirdparty/Sophus")
+
+# Pangolin
+OPTION(WITH_PANGOLIN_VIEWER "Build with Pangolin viewer?" OFF)
+if (WITH_PANGOLIN_VIEWER)
+    find_package(GLEW REQUIRED)
+    find_package(OpenGL REQUIRED)
+    include_directories(${EPOXY_INCLUDE_DIRS} ${GLEW_INCLUDE_DIRS} ${OPENGL_INCLUDE_DIR})
+    list(APPEND LIBS ${EPOXY_LIBRARIES} ${GLEW_LIBRARIES} ${OPENGL_LIBRARIES})
+
+    set(Pangolin_USER_DIR /opt/pangolin/092)
+    find_package(Pangolin REQUIRED PATHS ${Pangolin_USER_DIR})
+    include_directories(${Pangolin_USER_DIR}/include)
+    add_definitions(-DWITH_PANGOLIN_VIEWER)
+    list(APPEND LIBS ${Pangolin_LIBRARIES})
+    list(APPEND FILE_DIRS "gui")
+endif()
+
+# LibRealSense
+OPTION(WITH_REALSENSE "Build with RealSense Sensor?" OFF)
+
+# Iterate over each directory in FILE_DIRS
+message("FILE_DIRS: ${FILE_DIRS}")
+foreach(DIR ${FILE_DIRS})
+    # Collect all source files in the src directory
+    file(GLOB_RECURSE SOURCES "${DIR}/*.cpp" "${DIR}/*.cu" "${DIR}/*.cc")
+    list(APPEND ALL_SOURCES ${SOURCES})
+
+    # Collect all header files in the include directory
+    file(GLOB_RECURSE HEADERS "${DIR}/*.h" "${DIR}/*.hpp")
+    list(APPEND ALL_HEADERS ${HEADERS})
+
+    # Add include directories
+    include_directories(${DIR})
+endforeach()
+
+add_executable(${PROJECT_NAME} ${ALL_SOURCES} ${ALL_HEADERS})
+
+target_link_libraries(${PROJECT_NAME}
+    ${LIBS}
+    ${OpenCV_LIBS} 
+    ${Boost_FILESYSTEM_LIBRARY} ${Boost_SYSTEM_LIBRARY}
+    ${CUDA_LIBRARIES} ${CUDNN_LIBRARIES} ${TENSORRT_LIBRARIES}
+)
