@@ -23,11 +23,13 @@ cannyThreshold1: 150
 cannyThreshold2: 100
 
 #dataset
-MainFolder: "/data2/CSI/CSI_SVN/KirasCSISmartCam3D/CSISmartScan3D_Daten/Daten_Testszenen/TUM/freiburg1/"
+MainFolder: "/mnt/sdb/dataset/tum/rgbd/main/dataset"
 #Datasets: ["rgbd_dataset_freiburg1_desk2","rgbd_dataset_freiburg1_xyz"]
 Datasets: "rgbd_dataset_freiburg1_xyz"
 #Datasets: "rgbd_dataset_freiburg1_desk"
 ASSOCIATE: "associate.txt"
+
+poseOutDir: "./result/tum"
 
 #img pyr settings
 #Pyramid Settings: 0 is img resolution (e.g. 640x480), then always factor 2 smaller

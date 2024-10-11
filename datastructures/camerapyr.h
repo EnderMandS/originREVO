@@ -51,7 +51,7 @@ public:
     cv::read(dataF["width"], width, 640);
     this->height = static_cast<size_t>(height);
     this->width = static_cast<size_t>(width);
-    I3D_LOG(i3d::info) << "settingsPyr.DEPTH_MIN: " << DEPTH_MIN
+    I3D_LOG(i3d::debug) << "settingsPyr.DEPTH_MIN: " << DEPTH_MIN
                        << "settingsPyr.DEPTH_MAX" << DEPTH_MAX;
     float fx, fy, cx, cy;
     // Here, we could also use the standard ROS parameters for 640x480 -> fx =
@@ -113,8 +113,8 @@ class CameraPyr {
 public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   CameraPyr(const ImgPyramidSettings &settingsPyr) {
-    I3D_LOG(i3d::info) << settingsPyr.cannyThreshold1 << " "
-                       << settingsPyr.cannyThreshold2 << " " << settingsPyr.K;
+    I3D_LOG(i3d::debug) << settingsPyr.cannyThreshold1 << " "
+                        << settingsPyr.cannyThreshold2 << " " << settingsPyr.K;
     int nLevels = settingsPyr.nLevels();
     if (nLevels <= 0)
       return;
@@ -135,20 +135,20 @@ public:
       cv::initUndistortRectifyMap(camMatcV, settingsPyr.distCoeff,
                                   cv::Matx33d::eye(), newCamMat, imgSize,
                                   CV_16SC2, map1, map2);
-      I3D_LOG(i3d::info) << map1 << map2 << map1.size() << map2.size()
-                         << newCamMat;
+      I3D_LOG(i3d::debug) << map1 << map2 << map1.size() << map2.size()
+                          << newCamMat;
       fx = newCamMat.at<double>(0, 0);
       fy = newCamMat.at<double>(1, 1);
       cx = newCamMat.at<double>(0, 2);
       cy = newCamMat.at<double>(1, 2);
     }
-    I3D_LOG(i3d::info) << fx << " " << fy << " " << settingsPyr.nLevels();
+    I3D_LOG(i3d::debug) << fx << " " << fy << " " << settingsPyr.nLevels();
     camPyr.push_back(Camera(fx, fy, cx, cy, width, height));
     for (int lvl = 1; lvl <= nLevels; ++lvl) {
       const float scale = 1.0f / pow(2, lvl);
       camPyr.push_back(Camera(fx, fy, cx, cy, width, height, scale));
     }
-    I3D_LOG(i3d::info) << "camPyr.size(): " << camPyr.size();
+    I3D_LOG(i3d::debug) << "camPyr.size(): " << camPyr.size();
     // generate PCL Template
     for (size_t lvl = 0; lvl < camPyr.size(); ++lvl) {
       const Camera cam = camPyr[lvl];

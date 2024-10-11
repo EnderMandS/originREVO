@@ -19,28 +19,20 @@
  * along with REVO. If not, see <http://www.gnu.org/licenses/>.
  */
 #include "system/system.h"
-#include <memory>
 int main(int argc, char **argv) {
-  if (argc < 2) // first is name of program
-  {
+  LOG_THRESHOLD(i3d::info);
+  if (argc < 2)  {
     I3D_LOG(i3d::error)
         << "Not enough input arguments: REVO configFile.yaml datasetFile.yaml";
-    exit(0);
+    exit(EXIT_FAILURE);
   }
 
   // try to convert argument to string
   const std::string settingsFile = argv[1], datasetFile = argv[2];
-  int nRuns = 0;
-  // now start the system
-  while (true) {
-    REVO revoSystem(settingsFile, datasetFile, nRuns);
 
-    if (!revoSystem.start()) {
-      I3D_LOG(i3d::info) << "Finished all datasets!";
-      return EXIT_SUCCESS;
-    }
-    nRuns++;
-    I3D_LOG(i3d::info) << "nRuns" << nRuns;
-  }
+  REVO revoSystem(settingsFile, datasetFile);
+  revoSystem.start();
+  I3D_LOG(i3d::info) << "Finished";
+
   return EXIT_SUCCESS;
 }

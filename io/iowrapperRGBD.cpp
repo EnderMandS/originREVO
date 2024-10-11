@@ -23,6 +23,97 @@
 #include <boost/filesystem.hpp>
 #include <unistd.h>
 
+IOWrapperSettings::IOWrapperSettings(const std::string &settingsFile,
+                                     int nRuns) {
+  isFinished = false;
+  cv::FileStorage fs(settingsFile, cv::FileStorage::READ);
+  if (!fs.isOpened()) {
+    I3D_LOG(i3d::error) << "Couldn't open settings file at location: "
+                        << settingsFile;
+    exit(EXIT_FAILURE);
+  }
+  // image pyramid settings (camera matrix, resolutions,...)
+  int inputType; // 0 = dataset, 1 = ASTRA PRO, 2 = REAL SENSE
+  cv::read(fs["INPUT_TYPE"], inputType, 0);
+  READ_FROM_ASTRA_PRO = READ_FROM_REALSENSE = READ_FROM_ASTRA = false;
+  switch (inputType) {
+  case 1:
+    READ_FROM_ASTRA_PRO = true;
+    if (nRuns > 0)
+      isFinished = true;
+    break;
+  case 2:
+    READ_FROM_REALSENSE = true;
+    if (nRuns > 0)
+      isFinished = true;
+    break;
+  case 3:
+    READ_FROM_ASTRA = true;
+    if (nRuns > 0)
+      isFinished = true;
+    break;
+  // dataset
+  case 0:
+  default:
+    // now read all the settings
+    // general settings
+    // datasets or sensor?
+    cv::FileNode n = fs["Datasets"]; // Read string sequence - Get node
+    if (n.type() == cv::FileNode::SEQ) {
+      cv::FileNodeIterator it = n.begin(),
+                           it_end = n.end(); // Go through the node
+      for (; it != it_end; ++it)
+        datasets.push_back((std::string)*it);
+    } else {
+      I3D_LOG(i3d::debug) << "Running single dataset. Trying to read string!";
+      datasets.push_back(fs["Datasets"]);
+    }
+    I3D_LOG(i3d::info) << "Datasets: " << datasets.size()
+                       << " nRuns: " << nRuns;
+    if (nRuns >= int(datasets.size())) {
+      I3D_LOG(i3d::info) << "Finished all datasets!";
+      isFinished = true;
+      subDataset = datasets.back();
+    } else
+      subDataset = datasets[nRuns];
+    break;
+  }
+  // Ensure that it stops!
+  if ((READ_FROM_ASTRA_DATA || READ_FROM_REALSENSE) && nRuns > 0)
+    isFinished = true;
+  cv::read(fs["READ_INTRINSICS_FROM_SENSOR"], READ_INTRINSICS_FROM_SENSOR,
+           false);
+  // only needed to skip auto exposure artifacts
+  cv::read(fs["SKIP_FIRST_N_FRAMES"], SKIP_FIRST_N_FRAMES, 0);
+  cv::read(fs["READ_N_IMAGES"], READ_N_IMAGES,
+           100000); // read at least 100000 images
+  // cv::read(fs["DO_ADAPT_CANNY_VALUES"],DO_ADAPT_CANNY_VALUES, true);
+  // //tries to guess the Canny values from the first frame!
+  cv::read(fs["DO_WAIT_AUTOEXP"], DO_WAIT_AUTOEXP,
+           false); // skips the first 20 frames or so to avoid auto exposure
+                   // problems
+  if (SKIP_FIRST_N_FRAMES < 20 && DO_WAIT_AUTOEXP) {
+    SKIP_FIRST_N_FRAMES = 20;
+    I3D_LOG(i3d::warning)
+        << "Skipping first 20 frames to avoid auto exposure problems!";
+  }
+  if (!READ_INTRINSICS_FROM_SENSOR) {
+    cv::read(fs["DEPTH_SCALE_FACTOR"], DEPTH_SCALE_FACTOR, 1000.0f);
+    cv::read(fs["Camera.width"], imgSize.width, 640);
+    cv::read(fs["Camera.height"], imgSize.height, 480);
+  }
+  cv::read(fs["DO_RECORD_IMAGES"], DO_OUTPUT_IMAGES, false);
+  associateFile = (std::string)fs["ASSOCIATE"];
+  if (associateFile.compare(""))
+    associateFile = "associate.txt";
+  cv::read(fs["useDepthTimeStamp"], useDepthTimeStamp, true);
+  MainFolder = (std::string)fs["MainFolder"];
+  poseOutDir = (std::string)fs["poseOutDir"];
+  I3D_LOG(i3d::info) << "MainFolder: " << MainFolder;
+  I3D_LOG(i3d::info) << "poseOutDir: " << poseOutDir;
+  fs.release();
+}
+
 IOWrapperRGBD::IOWrapperRGBD(const IOWrapperSettings &settings,
                              const ImgPyramidSettings &mPyrSettings,
                              const std::shared_ptr<CameraPyr> &camPyr)
@@ -31,57 +122,28 @@ IOWrapperRGBD::IOWrapperRGBD(const IOWrapperSettings &settings,
       mAllImagesRead(false), mPyrConfig(mPyrSettings), mCamPyr(camPyr),
       mHasMoreImages(true), noFrames(0) {
   mInitSuccess = true;
-  I3D_LOG(i3d::info) << "camPyr->size(): " << camPyr->size() << " "
-                     << settings.MainFolder + settings.subDataset + "/";
-#ifdef WITH_ORBBEC_ASTRA_PRO
-  if (mSettings.READ_FROM_ASTRA_PRO) {
-    // OrbbecAstraEngine astra;
-    // bool t = astra.isInitSuccess();
-    I3D_LOG(i3d::info) << "After astra normal!";
-    // orbbecSensor = std::unique_ptr<OrbbecAstraEngine>(&astra);
-#ifdef WITH_ORBBEC_FFMPEG
-    orbbecAstraProSensor = std::unique_ptr<OrbbecAstraProEngineFFMPEG>(
-        new OrbbecAstraProEngineFFMPEG());
-#else
-    orbbecAstraProSensor =
-        std::unique_ptr<OrbbecAstraEngine>(new OrbbecAstraEngine());
-#endif
-    mInitSuccess = orbbecAstraProSensor->isInitSuccess();
-    I3D_LOG(i3d::info) << "After astra pro!";
-  } else
-    this->orbbecAstraProSensor = NULL;
-#endif
-#ifdef WITH_REALSENSE
-  if (mSettings.READ_FROM_REALSENSE) {
-    realSenseSensor = std::unique_ptr<RealsenseSensor>(new RealsenseSensor());
-  } else
-    this->realSenseSensor = NULL;
-#endif
-#ifdef WITH_ORBBEC_ASTRA
-  if (mSettings.READ_FROM_ASTRA) {
-    orbbecAstraSensor =
-        std::unique_ptr<OrbbecAstraOpenNIEngine>(new OrbbecAstraOpenNIEngine());
-    mInitSuccess = orbbecAstraSensor->isInitSuccess();
-    I3D_LOG(i3d::info) << "Astra Sensor initialized!";
-  } else
-    orbbecAstraSensor = NULL;
-
-#endif
+  I3D_LOG(i3d::info) << "camPyr->size(): " << camPyr->size();
   if (mSettings.READ_FROM_DATASET()) {
     // OPEN FILES
-    fileList.open((mSettings.MainFolder + mSettings.subDataset + "/" +
+    fileList.open((mSettings.MainFolder + "/" + mSettings.subDataset + "/" +
                    mSettings.associateFile)
                       .c_str(),
                   std::ios_base::in);
     I3D_LOG(i3d::info) << "Reading: "
-                       << (mSettings.MainFolder + mSettings.subDataset + "/" +
-                           mSettings.associateFile);
+                       << (mSettings.MainFolder + "/" + mSettings.subDataset +
+                           "/" + mSettings.associateFile);
     if (!fileList.is_open()) {
-      I3D_LOG(i3d::error) << "Could not open file list";
+      I3D_LOG(i3d::error) << "Could not open associateFile at: "
+                          << (mSettings.MainFolder + "/" +
+                              mSettings.subDataset + "/" +
+                              mSettings.associateFile);
       mQuitFlag = true;
+      exit(EXIT_FAILURE);
     }
     assert(fileList.is_open() && "File could not been opened!");
   }
+  rgb = cv::Mat(mSettings.imgSize.width, mSettings.imgSize.height, CV_8UC3);
+  depth = cv::Mat(mSettings.imgSize.width, mSettings.imgSize.height, CV_32FC1);
   // if (!mFileReader.isFileOpen()) mQuitFlag = true;
 }
 
@@ -190,7 +252,7 @@ void IOWrapperRGBD::generateImgPyramidFromAstra() {
 #endif
 }
 
-//#define WITH_REALSENSE
+// #define WITH_REALSENSE
 void IOWrapperRGBD::writeImages(const cv::Mat &rgb, const cv::Mat depth,
                                 const float timestamp) {
   if (!associateFile.is_open()) {
@@ -275,44 +337,46 @@ void IOWrapperRGBD::generateImgPyramidFromFiles() {
   //    cv::Mat rgb = cv::Mat(480,640,CV_8UC3);
   //    cv::Mat depth = cv::Mat(480,640,CV_32FC1);
   double rgbTimeStamp = 0, depthTimeStamp = 0;
+
+  // Frame count
+  std::string line;
+  int lineCount = 0;
+  fileList.clear();
+  fileList.seekg(0, std::ios::beg);
+  while (std::getline(fileList, line)) {
+    // Ignore lines that start with '#'
+    if (line.empty() || line[0] == '#') {
+      continue;
+    }
+    lineCount++;
+  }
+  fileList.clear();
+  fileList.seekg(0, std::ios::beg);
+  I3D_LOG(i3d::info) << "Total frames:" << lineCount;
+
   while (readNextFrame(rgb, depth, rgbTimeStamp, depthTimeStamp,
                        mSettings.SKIP_FIRST_N_FRAMES,
                        mSettings.DEPTH_SCALE_FACTOR) &&
          !mFinish) {
-
-    I3D_LOG(i3d::info) << "Read next Frame!";
     const double tumRefTimestamp =
         (mSettings.useDepthTimeStamp ? depthTimeStamp : rgbTimeStamp);
-    // clock_t start = clock();
-    auto start = Timer::getTime();
-    // there is a strange orbbec bug, where the first line of the "color" image
-    // is invalid
-    if (mSettings.READ_FROM_ASTRA_DATA) {
-      rgb.row(2).copyTo(rgb.row(0));
-      rgb.row(2).copyTo(rgb.row(1));
-    }
-
     nFrames++;
-    auto startPush = Timer::getTime();
-    I3D_LOG(i3d::info) << "Before img pyramid!";
+    I3D_LOG(i3d::info) << "Processing at frame:" << nFrames << "/" << lineCount;
+    auto t_start = Timer::getTime();
+    I3D_LOG(i3d::trace) << "Before img pyramid!";
     std::unique_ptr<ImgPyramidRGBD> pyrPtr(
         new ImgPyramidRGBD(mPyrConfig, mCamPyr, rgb, depth, tumRefTimestamp));
-    auto endPush = Timer::getTime();
-    I3D_LOG(i3d::info) << "Creating pyramid: "
-                       << Timer::getTimeDiffMiS(startPush, endPush) << " mis."
-                       << mSettings.DEPTH_SCALE_FACTOR;
+    I3D_LOG(i3d::trace) << "Creating pyramid: "
+                        << Timer::getTimeDiffMiS(t_start, Timer::getTime())
+                        << " ms." << mSettings.DEPTH_SCALE_FACTOR;
     {
-      auto startPush = Timer::getTime();
+      auto t_Push = Timer::getTime();
       std::unique_lock<std::mutex> lock(this->mtx);
       mPyrQueue.push(std::move(pyrPtr));
-      auto endPush = Timer::getTime();
-      I3D_LOG(i3d::info) << "Waiting for push: "
-                         << Timer::getTimeDiffMiS(startPush, endPush)
-                         << " mis.";
+      I3D_LOG(i3d::trace) << "Push wait: "
+                          << Timer::getTimeDiffMiS(t_Push, Timer::getTime())
+                          << " ms.";
     }
-    auto end = Timer::getTime();
-    I3D_LOG(i3d::info) << "Reading image: " << nFrames << " in "
-                       << Timer::getTimeDiffMiS(start, end);
     if (nFrames > mSettings.READ_N_IMAGES)
       break;
     usleep(1000);
@@ -326,12 +390,11 @@ void IOWrapperRGBD::generateImgPyramidFromFiles() {
 bool IOWrapperRGBD::readNextFrame(cv::Mat &rgb, cv::Mat &depth,
                                   double &rgbTimeStamp, double &depthTimeStamp,
                                   int skipFrames, double depthScaleFactor) {
-  I3D_LOG(i3d::info) << "readNextFrame!";
+  I3D_LOG(i3d::trace) << "Read next frame.";
   auto start = Timer::getTime();
   bool fileRead = false;
   std::string currRGBFile, currDepthFile;
   std::string inputLine;
-  // std::cout << this->dataFolder << std::endl;
   // read lines
   while ((std::getline(fileList, inputLine))) {
     // ignore comments
@@ -343,31 +406,44 @@ bool IOWrapperRGBD::readNextFrame(cv::Mat &rgb, cv::Mat &depth,
     std::istringstream is_associate(inputLine);
     is_associate >> rgbTimeStamp >> currRGBFile >> depthTimeStamp >>
         currDepthFile;
-    std::cout << "RGB Files: " << std::fixed << rgbTimeStamp << " filename "
-              << currRGBFile << std::endl;
-    std::cout << "Depth Files: " << std::fixed << depthTimeStamp << " filename "
-              << currDepthFile << std::endl;
+    currRGBFile =
+        mSettings.MainFolder + "/" + mSettings.subDataset + "/" + currRGBFile;
+    currDepthFile =
+        mSettings.MainFolder + "/" + mSettings.subDataset + "/" + currDepthFile;
+    I3D_LOG(i3d::debug) << "RGB Files: " << currRGBFile;
+    I3D_LOG(i3d::debug) << "Depth Files: " << currDepthFile;
     fileRead = true;
     break;
   }
-  // now read the images
-  // I3D_LOG(i3d::info) << "Reading: " <<
-  // mSettings.MainFolder+mSettings.subDataset+currRGBFile;
-  rgb = cv::imread(mSettings.MainFolder + mSettings.subDataset + "/" +
-                   currRGBFile);
-  depth = cv::imread(mSettings.MainFolder + mSettings.subDataset + "/" +
-                         currDepthFile,
-                     CV_LOAD_IMAGE_UNCHANGED);
+
+  if (fileList.eof()) {
+    I3D_LOG(i3d::info) << "All frames have been read.";
+    return false;
+  }
+
+  rgb = cv::imread(currRGBFile);
+  depth = cv::imread(currDepthFile, CV_LOAD_IMAGE_UNCHANGED);
+
+  bool exit_flag = false;
+  if (rgb.empty()) {
+    I3D_LOG(i3d::error) << "Fail to read rgb: " << currRGBFile;
+    exit_flag = true;
+  }
+  if (depth.empty()) {
+    I3D_LOG(i3d::error) << "Fail to read depth: " << currDepthFile;
+    exit_flag = true;
+  }
+  if (exit_flag) {
+    exit(EXIT_FAILURE);
+  }
+
   depth.convertTo(depth, CV_32FC1, 1.0f / depthScaleFactor);
   // divide by 5000 to get distance in metres
   // depth = depth/depthScaleFactor;
-  auto end = Timer::getTime();
-  I3D_LOG(i3d::info) << "readNextFrame " << std::fixed << depthTimeStamp
-                     << " Time: "
-                     << std::chrono::duration_cast<std::chrono::microseconds>(
-                            end - start)
-                            .count()
-                     << "mis";
+  auto dt = std::chrono::duration_cast<std::chrono::microseconds>(
+                Timer::getTime() - start)
+                .count();
+  I3D_LOG(i3d::trace) << "Read time: " << dt << "ms";
   return fileRead;
 }
 
@@ -378,10 +454,10 @@ void IOWrapperRGBD::setFinish(bool setFinish) {
 
 bool IOWrapperRGBD::getOldestPyramid(std::shared_ptr<ImgPyramidRGBD> &pyr) {
 
-  I3D_LOG(i3d::error) << "getOldestPyramid = " << mPyrQueue.size();
+  I3D_LOG(i3d::trace) << "getOldestPyramid = " << mPyrQueue.size();
   if (mPyrQueue.empty())
     return false;
-  I3D_LOG(i3d::error) << "mPyrQueue.size() = " << mPyrQueue.size();
+  I3D_LOG(i3d::trace) << "mPyrQueue.size() = " << mPyrQueue.size();
   std::unique_lock<std::mutex> lock(this->mtx);
   pyr = std::move(mPyrQueue.front());
   mPyrQueue.pop();

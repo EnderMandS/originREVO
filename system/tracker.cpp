@@ -138,7 +138,7 @@ TrackerNew::TrackerStatus TrackerNew::assessTrackingQuality(
   overlaps.push_back(0);
   // for debugging
   int outOfBounds = 0;
-  I3D_LOG(i3d::info) << "mPastPcl.size(): " << mPastPcl.size();
+  I3D_LOG(i3d::trace) << "mPastPcl.size(): " << mPastPcl.size();
   for (int frame = 0; frame < mSettings.nFramesHistogramVoting &&
                       (long unsigned int)frame < mPastPcl.size();
        ++frame) {
@@ -169,9 +169,9 @@ TrackerNew::TrackerStatus TrackerNew::assessTrackingQuality(
     cv::add(M_i, M, M);
   }
   float overlapMeasure = 0.0f;
-  I3D_LOG(i3d::info) << "outOfBounds: " << outOfBounds;
-  I3D_LOG(i3d::info) << histogram.size() << " " << overlaps.size() << " "
-                     << mCurrFrame->frameId;
+  I3D_LOG(i3d::detail) << "outOfBounds: " << outOfBounds;
+  I3D_LOG(i3d::detail) << histogram.size() << " " << overlaps.size() << " "
+                       << mCurrFrame->frameId;
 
   for (int xx = 0; xx < currEdges.cols; ++xx)
     for (int yy = 0; yy < currEdges.rows; ++yy) {
@@ -186,17 +186,18 @@ TrackerNew::TrackerStatus TrackerNew::assessTrackingQuality(
   for (size_t histLvl = 0; histLvl < histogram.size(); ++histLvl) {
     if (histLvl > 0)
       overlapMeasure += (overlaps.at(histLvl) * histWeights.at(histLvl));
-    I3D_LOG(i3d::info) << "histLvl: " << histLvl << " total "
-                       << histogram.at(histLvl)
-                       << " overlap: " << overlaps.at(histLvl) << "percentage: "
-                       << float(overlaps.at(histLvl)) / histogram.at(histLvl);
+    I3D_LOG(i3d::detail) << "histLvl: " << histLvl << " total "
+                         << histogram.at(histLvl)
+                         << " overlap: " << overlaps.at(histLvl)
+                         << "percentage: "
+                         << float(overlaps.at(histLvl)) / histogram.at(histLvl);
   }
-  I3D_LOG(i3d::info) << "overlapMeasure: " << overlapMeasure;
+  I3D_LOG(i3d::detail) << "overlapMeasure: " << overlapMeasure;
   if (overlapMeasure >= overlaps.at(0) ||
       histogram.size() <
           4) // || overlaps.at(histogram.size()-1) > overlaps.at(1)*0.5)
   {
-    I3D_LOG(i3d::info) << "No new keyframe!";
+    I3D_LOG(i3d::trace) << "No new keyframe!";
     // output reprojections
     cv::imwrite("out/M_" + std::to_string(mCurrFrame->frameId) + "_no.png", M);
     cv::imwrite("out/currEdges" + std::to_string(mCurrFrame->frameId) +
@@ -209,7 +210,7 @@ TrackerNew::TrackerStatus TrackerNew::assessTrackingQuality(
     return TRACKER_STATE_OK;
   }
 
-  I3D_LOG(i3d::info) << "New keyframe!";
+  I3D_LOG(i3d::trace) << "New keyframe!";
   // output reprojections
   cv::imwrite("out/M_" + std::to_string(mCurrFrame->frameId) + "_new.png", M);
   cv::imwrite("out/currEdges" + std::to_string(mCurrFrame->frameId) +
@@ -238,7 +239,7 @@ void TrackerNew::addOldPclAndPose(const Eigen::MatrixXf &pcl,
   //        mPastWorldPoses.pop_front();
   //        mPastTimeStamps.pop_front();
   //    }
-  I3D_LOG(i3d::info) << std::fixed << "Adding: " << timeStamp;
+  I3D_LOG(i3d::detail) << std::fixed << "Adding: " << timeStamp;
   mPastPcl.push_back(pcl);
   mPastWorldPoses.push_back(worldPose);
   mPastTimeStamps.push_back(timeStamp);
@@ -250,7 +251,6 @@ TrackerNew::TrackerNew(const TrackerSettings &config,
       mSettings(config), mPyrConfig(pyrConfig),
       mTrackerStatus(TRACKER_STATE_UNKNOWN),
       mOptimizer(config.optimizerSettings) {
-  I3D_LOG(i3d::info) << "Constructing Tracker!";
   histogramLevel = 2;
   // weights for overlap histogram
   histWeights.push_back(0);
@@ -271,7 +271,8 @@ TrackerNew::~TrackerNew() {
 
 void TrackerNew::clearUpPastLists() {
   while (mPastPcl.size() > (unsigned long)mSettings.nFramesHistogramVoting) {
-    I3D_LOG(i3d::info) << std::fixed << "Deleting: " << mPastTimeStamps.front();
+    I3D_LOG(i3d::detail) << std::fixed
+                         << "Deleting: " << mPastTimeStamps.front();
     mPastPcl.pop_front();
     mPastWorldPoses.pop_front();
     mPastTimeStamps.pop_front();
@@ -298,13 +299,12 @@ void TrackerNew::checkInitializationValues(
       evalCostFunction(Eigen::Matrix3f::Identity(), Eigen::Vector3f::Zero(),
                        minLvl, mCurrFrame, mRefFrame);
   const float costInit = evalCostFunction(R, T, minLvl, mCurrFrame, mRefFrame);
-  clock_t end = clock();
-  I3D_LOG(i3d::info) << "checkInitializationValues: "
-                     << double(end - start) / CLOCKS_PER_SEC * 1000.0f;
-  I3D_LOG(i3d::info) << "CostEye:" << costEye << " vs CostInit: " << costInit;
+  I3D_LOG(i3d::detail) << "checkInitializationValues: "
+                       << double(clock() - start) / CLOCKS_PER_SEC * 1000.0f;
+  I3D_LOG(i3d::detail) << "CostEye:" << costEye << " vs CostInit: " << costInit;
   if (costEye < costInit) {
-    I3D_LOG(i3d::error) << "DO NOT INIT WITH PREVIOUS TRANSFORM!" << costEye
-                        << " " << costInit;
+    I3D_LOG(i3d::warning) << "DO NOT INIT WITH PREVIOUS TRANSFORM!" << costEye
+                          << " " << costInit;
     R.setIdentity();
     T.setZero();
   }
@@ -341,13 +341,13 @@ TrackerNew::trackFrames(Eigen::Matrix3f &R, Eigen::Vector3f &T, float &error,
         currFrame->returnK(0), R, T, refFrame->returnEdges(0));
     // reprojectRefEdgesToCurrentFrame(mRefFrame->returnDistTransform(0),mCurrFrame->return3DEdges(0),mCurrFrame->returnK(0),R,T,mRefFrame->returnEdges(0),"init");
   }
-  I3D_LOG(i3d::info) << "Current Frame: " << currFrame->frameId;
+  I3D_LOG(i3d::debug) << "Current Frame: " << currFrame->frameId;
   // std::unique_lock<std::mutex> lock(mTrackerLock);
   auto beginInit = Timer::getTime();
   checkInitializationValues(R, T, currFrame, refFrame);
   auto endInit = Timer::getTime();
-  I3D_LOG(i3d::info) << "checkInitializationValues: "
-                     << Timer::getTimeDiffMiS(beginInit, endInit) << "mis";
+  I3D_LOG(i3d::detail) << "checkInitializationValues: "
+                       << Timer::getTimeDiffMiS(beginInit, endInit) << "mis";
   error = INFINITY;
   // std::vector<std::shared_ptr<ImgPyramidRGBD>> testVec;
   // testVec.push_back(currFrame);
@@ -357,7 +357,7 @@ TrackerNew::trackFrames(Eigen::Matrix3f &R, Eigen::Vector3f &T, float &error,
   // for (int lvl = 0; lvl >= mPyrConfig.maxLevel;--lvl)
   for (int lvl = mPyrConfig.PYR_MIN_LVL; lvl >= mPyrConfig.PYR_MAX_LVL; --lvl) {
 
-    I3D_LOG(i3d::warning)
+    I3D_LOG(i3d::detail)
         << "----LEVEL----"
         << lvl; // << " curr: " << std::fixed << currFrame->returnTimestamp() <<
                 // " to " << refFrame->returnTimestamp();
@@ -373,8 +373,8 @@ TrackerNew::trackFrames(Eigen::Matrix3f &R, Eigen::Vector3f &T, float &error,
     resInfo.clearAll();
     error = mOptimizer.trackFrames(refFrame, currFrame, R, T, lvl, resInfo);
     auto endT = Timer::getTime();
-    I3D_LOG(i3d::info) << "Tracking time for lvl " << lvl << ": "
-                       << Timer::getTimeDiffMiS(startT, endT) << "mis";
+    I3D_LOG(i3d::detail) << "Tracking time for lvl " << lvl << ": "
+                         << Timer::getTimeDiffMiS(startT, endT) << "mis";
   }
   // R = R_d.cast<float>();
   // T = T_d.cast<float>();
@@ -383,7 +383,7 @@ TrackerNew::trackFrames(Eigen::Matrix3f &R, Eigen::Vector3f &T, float &error,
         refFrame->returnGray(0), currFrame->return3DEdges(0),
         currFrame->returnK(0), R, T, refFrame->returnEdges(0), "after");
   }
-  I3D_LOG(i3d::error) << "FINAL AVG ERROR: " << error
+  I3D_LOG(i3d::debug) << "FINAL AVG ERROR: " << error
                       << " goodPtsEdge: " << resInfo.goodPtsEdges
                       << "badPtsEdge: " << resInfo.badPtsEdges << " good/bad = "
                       << double(resInfo.goodPtsEdges) /
@@ -391,7 +391,7 @@ TrackerNew::trackFrames(Eigen::Matrix3f &R, Eigen::Vector3f &T, float &error,
                       << " good / total"
                       << double(resInfo.goodPtsEdges) /
                              double(resInfo.badPtsEdges + resInfo.goodPtsEdges);
-  I3D_LOG(i3d::error) << "Final R: " << R << " final t: " << T;
+  I3D_LOG(i3d::debug) << "Final R: " << R << " final t: " << T;
   if (double(resInfo.goodPtsEdges) / double(resInfo.badPtsEdges) < 4)
     return TrackerNew::TRACKER_STATE_NEW_KF;
   return TrackerNew::TRACKER_STATE_OK;

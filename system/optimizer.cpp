@@ -62,9 +62,8 @@ Optimizer::Optimizer(const OptimizerSettings &settings) : mSettings(settings) {
   buf_warped_y = static_cast<float *>(Eigen::internal::aligned_malloc(memSize));
   buf_warped_z = static_cast<float *>(Eigen::internal::aligned_malloc(memSize));
   buf_weight_p = static_cast<float *>(Eigen::internal::aligned_malloc(memSize));
-  auto endOpt = Timer::getTime();
-  I3D_LOG(i3d::info) << "END Constructing Optimizer"
-                     << Timer::getTimeDiffMiS(startOpt, endOpt);
+  I3D_LOG(i3d::trace) << "END Constructing Optimizer"
+                      << Timer::getTimeDiffMiS(startOpt, Timer::getTime());
 }
 Optimizer::~Optimizer() {
   Eigen::internal::aligned_free(static_cast<void *>(buf_warped_residual));
@@ -82,7 +81,6 @@ float Optimizer::calcErrorAndBuffers(
     const std::shared_ptr<ImgPyramidRGBD> &currFrame, const Eigen::Matrix3f &R,
     const Eigen::Vector3f &T, ResidualInfo &resInfo, const uint lvl,
     bool FILL_BUFFERS) {
-  LOG_THRESHOLD(i3d::nothing);
   resInfo.clearAll();
   const Camera cam = refFrame->cameraPyr->at(lvl);
   const int w = cam.width, h = cam.height;
@@ -94,8 +92,8 @@ float Optimizer::calcErrorAndBuffers(
       refFrame->returnOptimizationStructure(lvl);
   // I3D_LOG(i3d::info) << "Before for!" << currPcl.cols() << " " <<
   // currPcl.col(0) << " " << refFrame->frameId;
-  I3D_LOG(i3d::info) << "Cam: " << std::fixed << cam.fx << " " << cam.fy << " "
-                     << cam.cx << " " << cam.cy;
+  I3D_LOG(i3d::trace) << "Cam: " << std::fixed << cam.fx << " " << cam.fy << " "
+                      << cam.cx << " " << cam.cy;
   for (int c = 0; c < currPcl.cols(); ++c) {
     const Eigen::Vector4f refPoint =
         currPcl.col(c); // first three are the vector
@@ -109,9 +107,9 @@ float Optimizer::calcErrorAndBuffers(
     // in image?
     if (!(u_new > 1 && v_new > 1 && u_new < w - 2 && v_new < h - 2)) {
       resInfo.badPtsEdges++;
-      I3D_LOG(i3d::info) << std::fixed << resInfo.badPtsEdges
-                         << " out of bounds: " << u_new << " " << v_new
-                         << "Z: " << refPoint[2] << " " << Wxp.transpose();
+      I3D_LOG(i3d::trace) << std::fixed << resInfo.badPtsEdges
+                          << " out of bounds: " << u_new << " " << v_new
+                          << "Z: " << refPoint[2] << " " << Wxp.transpose();
       continue;
     }
     const Eigen::Vector3f resInterp =
@@ -134,9 +132,9 @@ float Optimizer::calcErrorAndBuffers(
       *(buf_weight_p + eIdx) = w_r;
     }
     if (resInfo.goodPtsEdges < 30) {
-      I3D_LOG(i3d::info) << std::fixed << resInfo.goodPtsEdges << ": "
-                         << "(" << u_new << ", " << v_new
-                         << "):" << Wxp.transpose() << "Z: " << refPoint[2];
+      I3D_LOG(i3d::trace) << std::fixed << resInfo.goodPtsEdges << ": " << "("
+                          << u_new << ", " << v_new << "):" << Wxp.transpose()
+                          << "Z: " << refPoint[2];
     }
     const float res_2 = residual * residual;
     // I3D_LOG(i3d::info) << "residual: "<<residual << " resInfo: " <<
@@ -145,12 +143,11 @@ float Optimizer::calcErrorAndBuffers(
     resInfo.sumErrorUnweighted += res_2;
     resInfo.goodPtsEdges++;
   }
-  LOG_THRESHOLD(i3d::debug);
-  I3D_LOG(i3d::info) << std::fixed << "goodCount: " << (resInfo.goodPtsEdges)
-                     << "goodEdges: " << resInfo.goodPtsEdges
-                     << "badEdges: " << resInfo.badPtsEdges
-                     << " sumErrorUnweighted: " << resInfo.sumErrorUnweighted
-                     << " sumErrorWeighted: " << resInfo.sumErrorWeighted;
+  I3D_LOG(i3d::debug) << std::fixed << "goodCount: " << (resInfo.goodPtsEdges)
+                      << "goodEdges: " << resInfo.goodPtsEdges
+                      << "badEdges: " << resInfo.badPtsEdges
+                      << " sumErrorUnweighted: " << resInfo.sumErrorUnweighted
+                      << " sumErrorWeighted: " << resInfo.sumErrorWeighted;
   // exit(0);
   //    if (std::isnan(resInfo.sumErrorWeighted) ||
   //    std::isinf(resInfo.sumErrorWeighted))
@@ -218,7 +215,7 @@ float Optimizer::calcErrorAndBuffers(
   return resInfo.sumErrorWeighted / (resInfo.goodPtsEdges);
 }
 void Optimizer::calculateWarpUpdate(LGS6 &ls, int goodPoints) {
-  I3D_LOG(i3d::info) << "Computing warp update for " << goodPoints
+  I3D_LOG(i3d::detail) << "Computing warp update for " << goodPoints
                      << " residuals";
   ls.initialize(goodPoints);
   // int nEdges = 0;
@@ -258,7 +255,7 @@ float Optimizer::trackFrames(const std::shared_ptr<ImgPyramidRGBD> &refFrame,
                              const std::shared_ptr<ImgPyramidRGBD> &currFrame,
                              Eigen::Matrix3f &R, Eigen::Vector3f &T, int lvl,
                              ResidualInfo &resInfo) {
-  I3D_LOG(i3d::info) << "Track Frames!" << R << " " << T;
+  I3D_LOG(i3d::trace) << "Track Frames!" << R << " " << T;
   // ============ track frame ============
   // Sophus::SE3d referenceToFrame(R.cast<double>(),T.cast<double>());
   Sophus::SE3f referenceToFrame(R, T);
@@ -267,14 +264,14 @@ float Optimizer::trackFrames(const std::shared_ptr<ImgPyramidRGBD> &refFrame,
   // exit(0);
   float last_residual = lastErr;
   float LM_lambda = mSettings.lambdaInitial[lvl];
-  I3D_LOG(i3d::info) << "LM_lambda: " << LM_lambda;
+  I3D_LOG(i3d::detail) << "LM_lambda: " << LM_lambda;
   // int iterationNumber = 0;
   /// NOTE: We might need MAX_LVL-lvl or something like that
   for (int iteration = 0; iteration < mSettings.maxItsPerLvl[lvl];
        iteration++) {
     calculateWarpUpdate(ls, resInfo.goodPtsEdges);
     int incTry = 0;
-    I3D_LOG(i3d::info) << "calculateWarpUpdate:" << resInfo.goodPtsEdges;
+    I3D_LOG(i3d::detail) << "calculateWarpUpdate:" << resInfo.goodPtsEdges;
     while (true) {
       // solve LS system with current lambda
       Vector6 b = -ls.b;
@@ -297,7 +294,7 @@ float Optimizer::trackFrames(const std::shared_ptr<ImgPyramidRGBD> &refFrame,
           new_referenceToFrame.rotationMatrix() /*.cast<float>()*/,
           new_referenceToFrame.translation() /*.cast<float>()*/, resInfo, lvl);
       I3D_LOG(i3d::detail) << "After calcResidualAndBuffersEdges: " << error;
-      I3D_LOG(i3d::info) << "goodPts: " << resInfo.goodPtsEdges
+      I3D_LOG(i3d::detail) << "goodPts: " << resInfo.goodPtsEdges
                          << " bad: " << resInfo.badPtsEdges << " tot: "
                          << resInfo.goodPtsEdges + resInfo.badPtsEdges
                          << " error = " << error << "="
@@ -325,7 +322,7 @@ float Optimizer::trackFrames(const std::shared_ptr<ImgPyramidRGBD> &refFrame,
         break;
       } else {
         if (!(inc.dot(inc) > mSettings.stepSizeMin[lvl])) {
-          I3D_LOG(i3d::debug)
+          I3D_LOG(i3d::detail)
               << "(" << lvl << ", " << iteration
               << "): FINISHED pyramid level (stepsize too small).";
           iteration = mSettings.maxItsPerLvl[lvl];
@@ -337,7 +334,7 @@ float Optimizer::trackFrames(const std::shared_ptr<ImgPyramidRGBD> &refFrame,
           LM_lambda *= std::pow(mSettings.lambdaFailFac, incTry);
       }
     }
-    I3D_LOG(i3d::info) << "incTry: " << incTry;
+    I3D_LOG(i3d::detail) << "incTry: " << incTry;
   }
   R = referenceToFrame.rotationMatrix(); //.cast<float>();
   T = referenceToFrame.translation();    //.cast<float>();

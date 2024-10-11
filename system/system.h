@@ -36,19 +36,14 @@ public:
         settingsTracker(settingsFile) {
     // Handle output through IOWrapper
     // Initialize the thing using OpenCV
-
-    I3D_LOG(i3d::info) << "MainFolder: "
-                       << settingsIO.MainFolder + settingsIO.subDataset + "/"
-                       << nRuns;
-
     cv::FileStorage dataF(settingsFile, cv::FileStorage::READ);
     if (!dataF.isOpened()) {
       I3D_LOG(i3d::error) << "Couldn't open settings file at location: "
                           << settingsFile;
-      exit(0);
-    } else
-      I3D_LOG(i3d::error) << "Reading from settings file at location: "
-                          << settingsFile;
+      exit(EXIT_FAILURE);
+    }
+    I3D_LOG(i3d::info) << "Reading from settings file at location: "
+                       << settingsFile;
 
     // image pyramid settings (camera matrix, resolutions,...)
     cv::read(dataF["GT_POSEREADER_ACTIVE"], GT_POSEREADER_ACTIVE, false);
@@ -57,7 +52,6 @@ public:
     cv::read(dataF["DO_RECORD_IMAGES"], DO_RECORD_IMAGES, false);
     cv::read(dataF["DO_USE_PANGOLIN_VIEWER"], DO_USE_PANGOLIN_VIEWER, true);
     cv::read(dataF["DO_SHOW_DEBUG_IMAGE"], DO_SHOW_DEBUG_IMAGE, false);
-    I3D_LOG(i3d::info) << "DO_SHOW_DEBUG_IMAGE = " << DO_SHOW_DEBUG_IMAGE;
     cv::read(dataF["DO_GENERATE_DENSE_PCL"], DO_GENERATE_DENSE_PCL, false);
     dataF.release();
   }
@@ -134,7 +128,7 @@ public:
   std::vector<Pose> mPoseGraph;
 
   REVO(const std::string &settingsFile, const std::string &dataSettings,
-       int nRuns);
+       int nRuns=0);
   ~REVO();
   bool start();
   float reprojectPCLToImg(const Eigen::MatrixXf &pcl, const Eigen::Matrix3f &R,

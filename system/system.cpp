@@ -25,12 +25,11 @@
 #include <sophus/se3.hpp>
 #include <unistd.h>
 REVO::REVO(const std::string &settingsFile, const std::string &dataSettings,
-           int nRuns = 0)
+           int nRuns)
     : mSettings(settingsFile, dataSettings, nRuns),
       camPyr(new CameraPyr(
           mSettings.settingsPyr)) //,windowedOptimization(mSettings.settingsWO)
 {
-  I3D_LOG(i3d::debug) << "SystemRGBD constructor";
   isFinished = true;
   if (!mSettings.settingsIO.isFinished) {
 #ifdef WITH_PANGOLIN_VIEWER
@@ -53,16 +52,19 @@ REVO::REVO(const std::string &settingsFile, const std::string &dataSettings,
         new IOWrapperRGBD(mSettings.settingsIO, mSettings.settingsPyr, camPyr));
     I3D_LOG(i3d::detail) << "after wrapper thread!";
     if (mSettings.DO_OUTPUT_POSES && !mSettings.settingsIO.isFinished) {
-      const std::string poseFileName("poses_" +
-                                     mSettings.settingsIO.subDataset + ".txt");
-      mPoseFile.open((mSettings.outputFolder + poseFileName).c_str(),
-                     std::ios_base::out);
+      const std::string poseFileName(mSettings.settingsIO.subDataset + ".txt");
+      mPoseFile.open(
+          (mSettings.settingsIO.poseOutDir + "/" + poseFileName).c_str(),
+          std::ios_base::out);
       if (!mPoseFile.is_open()) {
-        I3D_LOG(i3d::error) << "Could not open pose file for writing! Exiting!";
-        exit(0);
+        I3D_LOG(i3d::error)
+            << "Could not open pose output file:"
+            << (mSettings.settingsIO.poseOutDir + "/" + poseFileName);
+        exit(EXIT_FAILURE);
       }
-      I3D_LOG(i3d::info) << "Opened pose file: "
-                         << (mSettings.outputFolder + poseFileName).c_str();
+      I3D_LOG(i3d::info)
+          << "Save pose to: "
+          << (mSettings.settingsIO.poseOutDir + poseFileName).c_str();
     }
     isFinished = false;
   }
@@ -101,7 +103,9 @@ bool REVO::start() {
         << "IO not initialized properly or all datasets computed";
     return false;
   }
+  I3D_LOG(i3d::trace) << "IO init success.";
   // set nRuns to choose dataset!
+
   /* System start up*/
   if (mThIOWrapper == NULL) {
     mThIOWrapper = std::unique_ptr<std::thread>(
@@ -118,6 +122,7 @@ bool REVO::start() {
   mTracker = std::unique_ptr<TrackerNew>(new TrackerNew(
       mSettings.settingsTracker, mSettings.settingsPyr)); //,camPyr));
   /* System start up end*/
+
   /*Initializations*/
   uint noFrames = 0, noTrackingLost = 0;
   flagTrackingLost = false;
@@ -130,6 +135,7 @@ bool REVO::start() {
   bool justAddedNewKeyframe = false;
   int nKeyFrames = 0;
   /*Initializations end*/
+
   // ImgPyramidRGBD kfPyr(mConfig.pyrConfig,mCamPyr);
   // Eigen::Matrix4f initPose;
   std::vector<std::tuple<Eigen::Matrix4f, bool>> baPoseGraph;
@@ -149,16 +155,16 @@ bool REVO::start() {
     }
 
     // Requesting image pyramid
-    I3D_LOG(i3d::error) << "Requesting img pyramid";
+    I3D_LOG(i3d::debug) << "Requesting img pyramid";
     if (!mIOWrapper->getOldestPyramid(currPyr)) {
       I3D_LOG(i3d::error) << "Error getting img pyramid";
       continue;
     }
-    I3D_LOG(i3d::error) << "Got img pyramid";
+    I3D_LOG(i3d::debug) << "Got img pyramid";
     // Got image pyramid
     currPyr->frameId = noFrames;
     const double tumRefTimestamp = currPyr->returnTimestamp();
-    I3D_LOG(i3d::info) << std::fixed << "tumRefTimestamp: " << tumRefTimestamp;
+    I3D_LOG(i3d::debug) << std::fixed << "tumRefTimestamp: " << tumRefTimestamp;
     if (noFrames == 0) // first frame -> keyframe
     {
       kfPyr = currPyr;
@@ -188,9 +194,9 @@ bool REVO::start() {
                                  kfPyr->returnTimestamp());
       continue;
     }
-    I3D_LOG(i3d::info) << std::fixed
-                       << "prevTime: " << prevPyr->returnTimestamp()
-                       << " currTime: " << currPyr->returnTimestamp();
+    I3D_LOG(i3d::debug) << std::fixed
+                        << "prevTime: " << prevPyr->returnTimestamp()
+                        << " currTime: " << currPyr->returnTimestamp();
     ++noFrames;
     if (mSettings.DO_SHOW_DEBUG_IMAGE) {
       int goodCount, badCount;
@@ -213,10 +219,10 @@ bool REVO::start() {
     //- Tracking lost
     trackerStatus = mTracker->assessTrackingQuality(
         currPoseInWorld, currPyr); //(mSettings.CHECK_TRACKING_RESULTS ?  :
-                                   //TrackerNew::TRACKER_STATE_OK);
+                                   // TrackerNew::TRACKER_STATE_OK);
     // if tracking gets inaccurate, take the previous frame as keyframe and try
-    // to optimize again. The idea is that the transformation between consecutive
-    // frames is more accurate
+    // to optimize again. The idea is that the transformation between
+    // consecutive frames is more accurate
     I3D_LOG(i3d::detail) << "posegraph: " << mPoseGraph.back().getCurrToWorld();
     if (trackerStatus == TrackerNew::TRACKER_STATE_NEW_KF &&
         !justAddedNewKeyframe) {
@@ -243,10 +249,8 @@ bool REVO::start() {
       mTracker->trackFrames(R, T, error, kfPyr, currPyr);
       T_KF_N = transformFromRT(R, T);
       // T_KF_NM1 = Eigen::Matrix4f::Identity();
-      currPoseInWorld =
-          kfPyr->getTransKFtoWorld() *
-          T_KF_N; // relativePoseToWorld(T_KF_N);//kfPyr->getTransKFtoWorld()*T_KF_N;;
-
+      // relativePoseToWorld(T_KF_N);//kfPyr->getTransKFtoWorld()*T_KF_N;;
+      currPoseInWorld = kfPyr->getTransKFtoWorld() * T_KF_N;
       trackerStatus = mTracker->assessTrackingQuality(currPoseInWorld, currPyr);
 #ifdef WITH_PANGOLIN_VIEWER
       if (mSettings.DO_USE_PANGOLIN_VIEWER) {
@@ -263,7 +267,7 @@ bool REVO::start() {
     } else
       justAddedNewKeyframe = false;
     auto endTracking = Timer::getTime();
-    I3D_LOG(i3d::warning)
+    I3D_LOG(i3d::debug)
         << "Tracking time: " << double(end - start) / CLOCKS_PER_SEC * 1000.0
         << " vs "
         << double(std::chrono::duration_cast<std::chrono::microseconds>(

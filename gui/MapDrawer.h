@@ -77,7 +77,7 @@ public:
 
     std::unique_lock<std::mutex> lock(this->mPclMutex);
     if (mIntegrating) {
-      I3D_LOG(i3d::info) << "Adding: " << kfPcl.cols() << " " << T_Wkf;
+      I3D_LOG(i3d::detail) << "Adding: " << kfPcl.cols() << " " << T_Wkf;
       this->vpKfsF.push_back(T_Wkf);
       this->pclKfsClr.push(kfPcl);
       this->pclKfHost.push_back(kfPcl);
