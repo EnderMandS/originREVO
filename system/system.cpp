@@ -226,13 +226,11 @@ bool REVO::start() {
     I3D_LOG(i3d::detail) << "posegraph: " << mPoseGraph.back().getCurrToWorld();
     if (trackerStatus == TrackerNew::TRACKER_STATE_NEW_KF &&
         !justAddedNewKeyframe) {
-      // make previous keyframe!
-      // kfPyr.swap(prevPyr);
+      I3D_LOG(i3d::info) << "Track bad, add new keyframe.";
       kfPyr = prevPyr;
       kfPyr->setTwf(mPoseGraph.back().getCurrToWorld());
       kfPyr->makeKeyframe();
       mPoseGraph.back().setKfFrame(kfPyr);
-      ;
       nKeyFrames++;
       mTracker->clearUpPastLists();
       // now, retrack
@@ -320,7 +318,8 @@ bool REVO::start() {
     }
 #endif
     prevPyr = currPyr;
-  }
+  } // while (mIOWrapper->hasMoreImages())
+
   mIOWrapper->setFinish(true);
 #ifdef WITH_PANGOLIN_VIEWER
   while (mpViewer && !this->mpViewer->quitRequest() &&
@@ -331,7 +330,7 @@ bool REVO::start() {
   I3D_LOG(i3d::info) << "-----VO Report-----";
   I3D_LOG(i3d::info) << "Frames Tracked: " << mPoseGraph.size();
   I3D_LOG(i3d::info) << "Keyframes Tracked: " << nKeyFrames;
-  I3D_LOG(i3d::info) << "Tracking Lost: " << noTrackingLost;
+  // I3D_LOG(i3d::info) << "Tracking Lost: " << noTrackingLost;
   double meandT = 0.0;
   for (size_t i = 0; i < ImgPyramidRGBD::dtTimes.size(); ++i)
     meandT += ImgPyramidRGBD::dtTimes[i];
@@ -341,6 +340,14 @@ bool REVO::start() {
   double sum = std::accumulate(trackingTimes.begin(), trackingTimes.end(), 0.0);
   double mean = sum / trackingTimes.size();
   I3D_LOG(i3d::info) << "Mean Tracking Time: " << mean;
+
+  if (mSettings.DO_OUTPUT_POSES) {
+    I3D_LOG(i3d::info) << "Poses have been saved to: "
+                       << (mSettings.settingsIO.poseOutDir + "/" +
+                           mSettings.settingsIO.subDataset + ".txt")
+                              .c_str();
+  }
+
   return true;
 }
 

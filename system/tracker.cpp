@@ -349,14 +349,9 @@ TrackerNew::trackFrames(Eigen::Matrix3f &R, Eigen::Vector3f &T, float &error,
   I3D_LOG(i3d::detail) << "checkInitializationValues: "
                        << Timer::getTimeDiffMiS(beginInit, endInit) << "mis";
   error = INFINITY;
-  // std::vector<std::shared_ptr<ImgPyramidRGBD>> testVec;
-  // testVec.push_back(currFrame);
-  // Eigen::Matrix3d R_d = R.cast<double>();
-  // Eigen::Vector3d T_d = T.cast<double>();
-  Optimizer::ResidualInfo resInfo;
-  // for (int lvl = 0; lvl >= mPyrConfig.maxLevel;--lvl)
-  for (int lvl = mPyrConfig.PYR_MIN_LVL; lvl >= mPyrConfig.PYR_MAX_LVL; --lvl) {
 
+  Optimizer::ResidualInfo resInfo;
+  for (int lvl = mPyrConfig.PYR_MIN_LVL; lvl >= mPyrConfig.PYR_MAX_LVL; --lvl) {
     I3D_LOG(i3d::detail)
         << "----LEVEL----"
         << lvl; // << " curr: " << std::fixed << currFrame->returnTimestamp() <<
@@ -412,7 +407,7 @@ float TrackerNew::evalCostFunction(
   cv::Mat distanceTransform = mRefFrame->returnDistTransform(minLvl);
   double min, max;
   cv::minMaxIdx(distanceTransform, &min, &max);
-  cv::imwrite("dist_trans.png", distanceTransform / max * 255);
+  // cv::imwrite("dist_trans.png", distanceTransform / max * 255);
   for (int ir = 0; ir < _3d.cols(); ir++) {
     const Eigen::Vector3f pt = _3d.col(ir).head<3>();
     Eigen::Vector3f newPt = R * pt + T;

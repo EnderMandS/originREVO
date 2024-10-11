@@ -257,11 +257,9 @@ float Optimizer::trackFrames(const std::shared_ptr<ImgPyramidRGBD> &refFrame,
                              ResidualInfo &resInfo) {
   I3D_LOG(i3d::trace) << "Track Frames!" << R << " " << T;
   // ============ track frame ============
-  // Sophus::SE3d referenceToFrame(R.cast<double>(),T.cast<double>());
   Sophus::SE3f referenceToFrame(R, T);
   lsd_slam::LGS6 ls;
   float lastErr = calcErrorAndBuffers(refFrame, currFrame, R, T, resInfo, lvl);
-  // exit(0);
   float last_residual = lastErr;
   float LM_lambda = mSettings.lambdaInitial[lvl];
   I3D_LOG(i3d::detail) << "LM_lambda: " << LM_lambda;
