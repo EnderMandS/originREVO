@@ -17,7 +17,7 @@ if(COMPILER_SUPPORTS_CXX17)
 endif()
 
 # Initialize variables to hold all source and header files
-set(FILE_DIRS system utils datastructures io pidinet)
+set(FILE_DIRS system utils datastructures io)
 set(ALL_SOURCES "main.cpp")
 set(ALL_HEADERS "")
 
@@ -53,14 +53,9 @@ include_directories(${EIGEN3_INCLUDE_DIRS})
 include_directories("thirdparty/Sophus")
 
 # Pangolin
-OPTION(WITH_PANGOLIN_VIEWER "Build with Pangolin viewer?" OFF)
+OPTION(WITH_PANGOLIN_VIEWER "Build with Pangolin viewer?" ON)
 if (WITH_PANGOLIN_VIEWER)
-    find_package(GLEW REQUIRED)
-    find_package(OpenGL REQUIRED)
-    include_directories(${EPOXY_INCLUDE_DIRS} ${GLEW_INCLUDE_DIRS} ${OPENGL_INCLUDE_DIR})
-    list(APPEND LIBS ${EPOXY_LIBRARIES} ${GLEW_LIBRARIES} ${OPENGL_LIBRARIES})
-
-    set(Pangolin_USER_DIR /opt/pangolin/092)
+    set(Pangolin_USER_DIR /opt/pangolin/060)
     find_package(Pangolin REQUIRED PATHS ${Pangolin_USER_DIR})
     include_directories(${Pangolin_USER_DIR}/include)
     add_definitions(-DWITH_PANGOLIN_VIEWER)

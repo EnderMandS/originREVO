@@ -21,15 +21,15 @@
 #include "system/system.h"
 int main(int argc, char **argv) {
   LOG_THRESHOLD(i3d::info);
-  if (argc < 2)  {
+  if (argc < 2) {
     I3D_LOG(i3d::error)
         << "Not enough input arguments: REVO configFile.yaml datasetFile.yaml";
     exit(EXIT_FAILURE);
   }
 
-  // try to convert argument to string
   const std::string settingsFile = argv[1], datasetFile = argv[2];
 
+  I3D_LOG(i3d::info) << "Start REVO system.";
   REVO revoSystem(settingsFile, datasetFile);
   revoSystem.start();
   I3D_LOG(i3d::info) << "Finished";

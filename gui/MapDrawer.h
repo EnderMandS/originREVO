@@ -28,7 +28,6 @@
 //#include <Eigen/StdDeque>
 #include "../utils/Logging.h"
 #include <Eigen/Eigen>
-#include <memory>
 #include <mutex>
 #include <opencv2/opencv.hpp>
 #include <pangolin/pangolin.h>

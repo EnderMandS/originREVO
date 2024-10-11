@@ -27,12 +27,12 @@ public:
   PointCloudBuffered(const Eigen::MatrixXf &pcl, bool hasColor = false)
       : nPoints(pcl.cols()), mHasColor(hasColor), mSize(hasColor ? 8 : 4) {
     glGenBuffers(1, &vbo);
-    I3D_LOG(i3d::info) << " Binding: " << (nPoints - 1) * mSize * sizeof(float);
+    I3D_LOG(i3d::detail) << " Binding: " << (nPoints - 1) * mSize * sizeof(float);
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
     glBufferData(GL_ARRAY_BUFFER, (nPoints - 1) * mSize * sizeof(float),
                  (float *)pcl.data(), GL_STATIC_DRAW);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
-    I3D_LOG(i3d::info) << "After Binding: "
+    I3D_LOG(i3d::detail) << "After Binding: "
                        << (nPoints - 1) * mSize * sizeof(float);
   }
   ~PointCloudBuffered() { glDeleteBuffers(1, &vbo); }

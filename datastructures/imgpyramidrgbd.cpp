@@ -66,7 +66,7 @@ ImgPyramidRGBD::ImgPyramidRGBD(const ImgPyramidSettings &settings,
   this->addLevelEdge(gray, depth, cameraPyr->at(0));
   auto endLvl = Timer::getTime();
   I3D_LOG(i3d::trace) << "AddLevel 0: "
-                     << Timer::getTimeDiffMiS(startLvl, endLvl);
+                      << Timer::getTimeDiffMiS(startLvl, endLvl);
   for (int lvl = 1; lvl < settings.nLevels(); ++lvl) {
     auto startLvl = Timer::getTime();
     I3D_LOG(i3d::detail) << "lvl: " << lvl;
@@ -81,12 +81,12 @@ ImgPyramidRGBD::ImgPyramidRGBD(const ImgPyramidSettings &settings,
     depth = downResDepth;
     auto endLvl = Timer::getTime();
     I3D_LOG(i3d::trace) << "AddLevel " << lvl << ": "
-                       << Timer::getTimeDiffMiS(startLvl, endLvl);
+                        << Timer::getTimeDiffMiS(startLvl, endLvl);
   }
   auto endPyr = Timer::getTime();
   // if (timestamp == 531) exit(0);
   I3D_LOG(i3d::trace) << "Time for creating pyramid: "
-                     << Timer::getTimeDiffMiS(startPyr, endPyr);
+                      << Timer::getTimeDiffMiS(startPyr, endPyr);
 }
 void ImgPyramidRGBD::getEdges(cv::Mat &edges, const cv::Mat &gray) {
   I3D_LOG(i3d::detail) << mSettings.cannyThreshold1 << " "
@@ -103,8 +103,8 @@ void ImgPyramidRGBD::getEdges(cv::Mat &edges, const cv::Mat &gray) {
 }
 
 void ImgPyramidRGBD::fillInEdges(size_t lvl) {
-  I3D_LOG(i3d::detail) << "fillInEdges(int lvl): " << lvl << " " << histPyr.size()
-                     << " " << edgesPyr.size();
+  I3D_LOG(i3d::detail) << "fillInEdges(int lvl): " << lvl << " "
+                       << histPyr.size() << " " << edgesPyr.size();
   const cv::Mat dist = histPyr[lvl];          // get top level
   const cv::Mat topEdges = edgesPyr[lvl - 1]; // get top level
   cv::Mat edgesMod = edgesPyr[lvl];
@@ -195,7 +195,7 @@ void ImgPyramidRGBD::addLevelEdge(const cv::Mat &gray, const cv::Mat &depth,
   const float nPercentage = generateDistHistogram(edges, distPatchSizes[lvl]);
   if (mSettings.USE_EDGE_HIST && edgesPyr.size() > 1) {
     I3D_LOG(i3d::detail) << "mSettings.USE_EDGE_HIST: "
-                       << mSettings.USE_EDGE_HIST;
+                         << mSettings.USE_EDGE_HIST;
 
     if (nPercentage < mSettings.nPercentage) {
       fillInEdges(lvl);
@@ -206,8 +206,8 @@ void ImgPyramidRGBD::addLevelEdge(const cv::Mat &gray, const cv::Mat &depth,
   Eigen::MatrixXf ref3dList = Eigen::MatrixXf(4, int(cam.area));
   // Eigen::MatrixXf ref3dListDepth = Eigen::MatrixXf(4,int(cam.area/3.0));
   I3D_LOG(i3d::detail) << "Allocated " << ref3dList.cols() << " at size "
-                     << cam.width << "x" << cam.height
-                     << ". Edges: " << edges.cols << " " << edges.rows;
+                       << cam.width << "x" << cam.height
+                       << ". Edges: " << edges.cols << " " << edges.rows;
   int linIdx = 0; //, linIdxDepth = 0;
   for (int xx = 0; xx < edges.cols; xx++) {
     for (int yy = 0; yy < edges.rows; yy++) {
@@ -228,11 +228,12 @@ void ImgPyramidRGBD::addLevelEdge(const cv::Mat &gray, const cv::Mat &depth,
       }
     }
   }
-  I3D_LOG(i3d::trace) << "Lvl: " << lvl << ". nEdges: " << linIdx; // << modDepth;
+  I3D_LOG(i3d::trace) << "Lvl: " << lvl
+                      << ". nEdges: " << linIdx; // << modDepth;
   this->edges3DPyr.push_back(ref3dList.leftCols(linIdx));
   clock_t end = clock();
   I3D_LOG(i3d::trace) << "addLevel actual time: "
-                     << double(end - start) / CLOCKS_PER_SEC * 1000.0f;
+                      << double(end - start) / CLOCKS_PER_SEC * 1000.0f;
 }
 // Compute the distance transform and the acceleration structure!
 void ImgPyramidRGBD::makeKeyframe() {
@@ -247,8 +248,8 @@ void ImgPyramidRGBD::makeKeyframe() {
                           CV_DIST_MASK_PRECISE);
     this->dtPyr.push_back(dt);
     I3D_LOG(i3d::detail) << "buildOptimizationStructure: "
-                       << int(cam.area) * sizeof(Eigen::Vector4f)
-                       << "sizeof: " << sizeof(Eigen::Vector4f);
+                         << int(cam.area) * sizeof(Eigen::Vector4f)
+                         << "sizeof: " << sizeof(Eigen::Vector4f);
     Eigen::Vector4f *optStruc =
         (Eigen::Vector4f *)Eigen::internal::aligned_malloc(
             int(cam.area) * sizeof(Eigen::Vector4f));
@@ -259,7 +260,7 @@ void ImgPyramidRGBD::makeKeyframe() {
   auto end = Timer::getTime();
   ImgPyramidRGBD::dtTimes.push_back(Timer::getTimeDiffMs(start, end));
   I3D_LOG(i3d::trace) << "Computation of DT: "
-                     << Timer::getTimeDiffMs(start, end);
+                      << Timer::getTimeDiffMs(start, end);
 }
 
 void ImgPyramidRGBD::buildOptimizationStructure(
@@ -327,7 +328,7 @@ void ImgPyramidRGBD::generateColoredPcl(uint lvl, Eigen::MatrixXf &clrPcl,
       }
     }
   }
-  I3D_LOG(i3d::info) << clrPcl.cols() << " " << clrPcl.rows();
+  I3D_LOG(i3d::detail) << clrPcl.cols() << " " << clrPcl.rows();
   clrPcl.conservativeResize(clrPcl.rows(), linIdx);
   // clrPcl = clrPcl.leftCols(linIdx;
 }

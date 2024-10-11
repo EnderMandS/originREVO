@@ -131,7 +131,7 @@ void Viewer::Run() {
         const std::shared_ptr<PointCloudBuffered> pclPtr(
             new PointCloudBuffered(kfPcl, true));
         {
-          I3D_LOG(i3d::info) << "newPcl";
+          I3D_LOG(i3d::trace) << "newPcl";
           std::unique_lock<std::mutex> lock(mMtxPclBuffered);
           this->mPclKfsBuffered.push_back(pclPtr);
         }
